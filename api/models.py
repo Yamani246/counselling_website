@@ -11,14 +11,14 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, default='')
     uni_id = models.CharField(max_length=50)
     role = models.CharField(max_length=50,null=True)
-    department=models.CharField(max_length=50,default='',null=True,blank=True)
+    department=models.ForeignKey('Branch', on_delete=models.SET_NULL, null=True, blank=True,related_name='user_branch')
     batch_id=models.ForeignKey('Batch', on_delete=models.SET_NULL, null=True, blank=True,related_name='batch_m')
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
-    last_login = models.DateTimeField(null=True, blank=True)
-    no_of_students=models.IntegerField(null=True, blank=True)
+    last_login = models.DateTimeField(default=timezone.now)
+    
 
     USERNAME_FIELD = 'username'
     EMAIL_FIELD = 'email'  
@@ -38,9 +38,14 @@ class Academicyear(models.Model):
 class Batch(models.Model):
     id=models.AutoField(primary_key=True)
     batch_no=models.CharField(max_length=100)
-
+    no_of_students=models.IntegerField(null=True, blank=True)
+    from_roll=models.CharField(max_length=50,null=True, blank=True)
+    to_roll=models.CharField(max_length=50,null=True, blank=True)
+    department=models.ForeignKey('Branch', on_delete=models.SET_NULL, null=True, blank=True,related_name='batch_branch')
+    aca_year=models.ForeignKey('Academicyear', on_delete=models.CASCADE, null=True, blank=True,related_name='batch_academic_year')
     def __str__(self):
         return f'batch no {str(self.batch_no)}'
+    
 class Student(models.Model):
     id = models.AutoField(primary_key=True)
     reg_id=models.CharField(max_length=50)
@@ -48,7 +53,7 @@ class Student(models.Model):
     aca_year=models.ForeignKey('Academicyear', on_delete=models.CASCADE, null=True, blank=True,related_name='student')
     name=models.CharField(max_length=100)
     email = models.CharField(max_length=50,default='',null=True,blank=True)
-    department=models.CharField(max_length=50,default='',null=True,blank=True)
+    department=models.ForeignKey('Branch', on_delete=models.SET_NULL, null=True, blank=True,related_name='student_branch')
     section=models.CharField(max_length=50,default='',null=True,blank=True)
     dob=models.DateField(default=None)
     mother_name=models.CharField(max_length=100)
@@ -73,15 +78,17 @@ class Student(models.Model):
     ecet_eamcet_rank=models.IntegerField()
     category=models.CharField(max_length=100)
     sub_category=models.CharField(max_length=100)
-    mentor = models.ForeignKey('CustomUser', on_delete=models.SET_NULL, null=True, blank=True,related_name='counsellor')
+    cgpa=models.DecimalField(max_digits=10, decimal_places=2,null=True, blank=True)
+    tot_backlogs=models.IntegerField( null=True, blank=True)
     
     def __str__(self):
         return f"{self.name} - {self.id}"
 
 class Attendance(models.Model):
     id = models.AutoField(primary_key=True)
+    sem_id=models.ForeignKey('Semester', on_delete=models.CASCADE, null=True, blank=True,related_name='sem_attendance')
     student = models.ForeignKey('Student', on_delete=models.CASCADE, null=True, blank=True,related_name='attendances')
-    date_joined = models.DateTimeField(default=timezone.now)
+    date = models.DateTimeField(default=timezone.now)
     attended=models.IntegerField()
     conducted=models.IntegerField()
     percentage=models.DecimalField(max_digits=10, decimal_places=2)
@@ -94,23 +101,17 @@ class Attendance(models.Model):
 class Semester(models.Model):
     id = models.AutoField(primary_key=True)
     semester_no=models.IntegerField()
-    sgpa=models.DecimalField(max_digits=10, decimal_places=2)
-    student = models.ForeignKey('Student', on_delete=models.CASCADE, null=True, blank=True,related_name='sem')
-    backlogs = models.PositiveIntegerField(default=0)
-    backlog_list = models.TextField(blank=True)
-
     def __str__(self):
-        return f"{self.sgpa} SGPA ({self.backlogs} Backlogs) for {self.student.name if self.student else 'No Student'}"
+        return str(self.semester_no)
     
 class Result(models.Model):
     id = models.AutoField(primary_key=True)
     student = models.ForeignKey('Student', on_delete=models.CASCADE, null=True, blank=True,related_name='result')
-    cgpa=models.DecimalField(max_digits=10, decimal_places=2)
-    tot_backlogs=models.IntegerField()
+    sem_id=models.ForeignKey('Semester', on_delete=models.CASCADE, null=True, blank=True,related_name='result_sem')
+    sgpa=models.DecimalField(max_digits=10, decimal_places=2)
+    backlogs = models.PositiveIntegerField(default=0)
+    backlog_list = models.TextField(blank=True)
 
-    
-    def __str__(self):
-        return f" {self.cgpa} CGPA ({self.tot_backlogs} Backlogs) for {self.student.name if self.student else 'No Student'}"
     
 class Issues_remarks(models.Model):
     id = models.AutoField(primary_key=True)
@@ -129,3 +130,9 @@ class Issues_remarks(models.Model):
 
     def __str__(self):
         return f"IssuesRemarks - {self.date} ({self.student.name if self.student else 'No Student'})"
+
+class Branch(models.Model):
+    id = models.AutoField(primary_key=True)
+    department=models.CharField(max_length=100)
+    def __str__(self):
+        return self.department
